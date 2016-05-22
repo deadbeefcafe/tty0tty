@@ -30,6 +30,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/select.h>
+#include <sys/time.h>
 #include <errno.h>
 
 #ifdef __APPLE__
@@ -39,7 +40,9 @@
 #include <termio.h>
 #endif
 
-static char buffer[1024];
+int debug = 0;
+
+static unsigned char buffer[1024];
 
 int
 ptym_open(char *pts_name, char *pts_name_s , int pts_namesz)
@@ -111,11 +114,24 @@ tcflush(serialDev, TCIOFLUSH);
   return EXIT_SUCCESS;
 }
 
+
+void
+printhex(char *prefix, unsigned char *buf, int len)
+{
+    int x;
+    struct timeval tv;
+    gettimeofday(&tv,0);
+    double now = tv.tv_sec + tv.tv_usec/1000000.0;
+    printf("%.6f %s len:%d",now,prefix,len);
+    for(x=0;x<len;x++) printf(" %2.2x",buf[x]);
+    printf("\n");
+}
+
 void
 copydata(int fdfrom, int fdto)
 {
   ssize_t br, bw;
-  char *pbuf = buffer;
+  unsigned char *pbuf = buffer;
   br = read(fdfrom, buffer, 1024);
   if (br < 0)
   {
@@ -131,6 +147,7 @@ copydata(int fdfrom, int fdto)
   }
   if (br > 0)
   {
+    if (debug) printhex(fdfrom<fdto?"<--":"-->",pbuf,br);
     do
     {
       do
@@ -166,11 +183,28 @@ int main(int argc, char* argv[])
   char master2[1024];
   char slave2[1024];
 
+  int opt;
   int fd1;
   int fd2;
 
   fd_set rfds;
   int retval;
+
+
+    while((opt = getopt(argc,argv,"qvdp:b:")) != -1) {
+        switch(opt) {
+            case 'd':
+                debug++;
+                break;
+            default:
+                fprintf(stderr, "Usage: %s [-d]  [filename filename]\n", argv[0]);
+                exit(EXIT_FAILURE);
+        }
+    }
+
+
+
+
 
   fd1=ptym_open(master1,slave1,1024);
 
